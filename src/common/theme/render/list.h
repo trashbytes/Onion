@@ -16,10 +16,10 @@
 
 // Persistent state for the active-item marquee scroll.
 // Rendering is single-threaded (SDL main loop), so plain statics are safe.
-static SDL_Surface *_list_scroll_surface = NULL;
-static int          _list_scroll_x       = 0;
-static int          _list_scroll_list_id = -1;
-static int          _list_scroll_active  = -1;
+static SDL_Surface *list_scroll_surface = NULL;
+static int          list_scroll_x       = 0;  // negative = initial delay phase
+static int          list_scroll_list_id = -1;
+static int          list_scroll_active  = -1;
 
 void theme_renderListLabel(SDL_Surface *screen, const char *label, SDL_Color fg,
                            int offset_x, int center_y, bool is_active,
@@ -195,36 +195,40 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
                 label_end = preview_label_end;
 
             // Reset scroll state whenever the list or the selected item changes
-            if (list->_id != _list_scroll_list_id || list->active_pos != _list_scroll_active) {
-                if (_list_scroll_surface != NULL) {
-                    SDL_FreeSurface(_list_scroll_surface);
-                    _list_scroll_surface = NULL;
+            if (list->_id != list_scroll_list_id || list->active_pos != list_scroll_active) {
+                if (list_scroll_surface != NULL) {
+                    SDL_FreeSurface(list_scroll_surface);
+                    list_scroll_surface = NULL;
                 }
-                _list_scroll_x = -(LIST_LABEL_SCROLL_DELAY * LIST_LABEL_SCROLL_SPEED);
-                _list_scroll_list_id = list->_id;
-                _list_scroll_active = list->active_pos;
+                // Start with a negative counter so the label holds still for
+                // LIST_LABEL_SCROLL_DELAY frames before scrolling begins.
+                list_scroll_x = -(LIST_LABEL_SCROLL_DELAY * LIST_LABEL_SCROLL_SPEED);
+                list_scroll_list_id = list->_id;
+                list_scroll_active = list->active_pos;
             }
 
-            // Lazily render the full-width label surface once per selection
-            if (_list_scroll_surface == NULL)
-                _list_scroll_surface = TTF_RenderUTF8_Blended(list_font, item->label, theme()->list.color);
+            // Lazily render the full-width label surface once per selection.
+            // If TTF_RenderUTF8_Blended fails, list_scroll_surface stays NULL
+            // and theme_renderListLabel is used as a fallback (see below).
+            if (list_scroll_surface == NULL)
+                list_scroll_surface = TTF_RenderUTF8_Blended(list_font, item->label, theme()->list.color);
 
             int avail_w = label_end - offset_x - LIST_LABEL_END_MARGIN * g_scale;
 
-            if (_list_scroll_surface != NULL && avail_w > 0 && _list_scroll_surface->w > avail_w) {
+            if (list_scroll_surface != NULL && avail_w > 0 && list_scroll_surface->w > avail_w) {
                 // Label is wider than the available space: apply marquee scrolling
-                int px = _list_scroll_x > 0 ? _list_scroll_x : 0;
-                int max_offset = _list_scroll_surface->w - avail_w;
+                int px = list_scroll_x > 0 ? list_scroll_x : 0;
+                int max_offset = list_scroll_surface->w - avail_w;
                 if (px > max_offset)
                     px = max_offset;
-                SDL_Rect crop = {px, 0, avail_w, _list_scroll_surface->h};
-                SDL_Rect pos = {offset_x, item_bg_rect.y + label_y - _list_scroll_surface->h / 2};
-                SDL_BlitSurface(_list_scroll_surface, &crop, screen, &pos);
+                SDL_Rect crop = {px, 0, avail_w, list_scroll_surface->h};
+                SDL_Rect pos = {offset_x, item_bg_rect.y + label_y - list_scroll_surface->h / 2};
+                SDL_BlitSurface(list_scroll_surface, &crop, screen, &pos);
 
                 // Advance the scroll counter; wrap back after the end-of-label pause
-                _list_scroll_x += LIST_LABEL_SCROLL_SPEED;
-                if (_list_scroll_x > max_offset + LIST_LABEL_SCROLL_PAUSE * LIST_LABEL_SCROLL_SPEED)
-                    _list_scroll_x = -(LIST_LABEL_SCROLL_DELAY * LIST_LABEL_SCROLL_SPEED);
+                list_scroll_x += LIST_LABEL_SCROLL_SPEED;
+                if (list_scroll_x > max_offset + LIST_LABEL_SCROLL_PAUSE * LIST_LABEL_SCROLL_SPEED)
+                    list_scroll_x = -(LIST_LABEL_SCROLL_DELAY * LIST_LABEL_SCROLL_SPEED);
             }
             else {
                 // Label fits within the available space: render statically, no scroll
@@ -248,9 +252,9 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
 
     // If no preview is active this frame, release any cached scroll surface so
     // memory is not retained after the user navigates away from a previewed item.
-    if (active_preview == NULL && _list_scroll_surface != NULL) {
-        SDL_FreeSurface(_list_scroll_surface);
-        _list_scroll_surface = NULL;
+    if (active_preview == NULL && list_scroll_surface != NULL) {
+        SDL_FreeSurface(list_scroll_surface);
+        list_scroll_surface = NULL;
     }
 
     if (active_preview != NULL) {
