@@ -20,6 +20,10 @@
 #define LIST_LABEL_SCROLL_PAUSE_MS     500  // hold at end before restarting
 #define LIST_LABEL_END_MARGIN          30   // right-side padding (px)
 
+#if LIST_LABEL_SCROLL_PX_PER_SEC <= 0
+#error "LIST_LABEL_SCROLL_PX_PER_SEC must be greater than zero."
+#endif
+
 // Persistent state for the active-item marquee scroll.
 // Rendering is single-threaded (SDL main loop), so plain statics are safe.
 static SDL_Surface *list_scroll_surface = NULL;
@@ -215,6 +219,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
         }
 
         bool preview_active_for_marquee = (active_preview != NULL) || LIST_MARQUEE_FORCE_PREVIEW_ACTIVE;
+        const char *item_label = item->label != NULL ? item->label : "";
 
         // Marquee scroll the active item's label when the preview panel is considered present.
         if (i == list->active_pos && preview_active_for_marquee) {
@@ -229,7 +234,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
 
             // Reset scroll state whenever the list, active item, or label text changes.
             bool context_changed = list->_id != list_scroll_list_id || list->active_pos != list_scroll_active ||
-                                   strcmp(item->label, list_scroll_label) != 0;
+                                   strcmp(item_label, list_scroll_label) != 0;
             if (context_changed) {
                 if (list_scroll_surface != NULL) {
                     SDL_FreeSurface(list_scroll_surface);
@@ -237,7 +242,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
                 }
                 list_scroll_list_id = list->_id;
                 list_scroll_active = list->active_pos;
-                snprintf(list_scroll_label, sizeof(list_scroll_label), "%s", item->label);
+                snprintf(list_scroll_label, sizeof(list_scroll_label), "%s", item_label);
                 list_scroll_start_ms = SDL_GetTicks();
             }
 
@@ -245,7 +250,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
             // If TTF_RenderUTF8_Blended fails, list_scroll_surface stays NULL
             // and theme_renderListLabel is used as a fallback (see below).
             if (list_scroll_surface == NULL)
-                list_scroll_surface = TTF_RenderUTF8_Blended(list_font, item->label, theme()->list.color);
+                list_scroll_surface = TTF_RenderUTF8_Blended(list_font, item_label, theme()->list.color);
 
             int avail_w = label_end - offset_x - LIST_LABEL_END_MARGIN * g_scale;
 
@@ -290,7 +295,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
             }
             else {
                 // Label fits within the available space: render statically, no scroll
-                theme_renderListLabel(screen, item->label, theme()->list.color,
+                theme_renderListLabel(screen, item_label, theme()->list.color,
                                       offset_x, item_bg_rect.y + label_y,
                                       true, label_end, show_disabled);
             }
