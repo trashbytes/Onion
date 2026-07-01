@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
             if (header_changed || battery_changed)
                 theme_renderHeader(screen, menu_stack[menu_level]->title, false);
 
-            if (list_changed)
+            if (list_changed || theme_listMarqueeNeedsRedraw())
                 theme_renderList(screen, menu_stack[menu_level]);
 
             if (footer_changed) {
