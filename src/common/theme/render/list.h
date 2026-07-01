@@ -9,11 +9,13 @@
 // static SDL_Color color_black = {0, 0, 0};
 
 // Marquee scroll settings for the active-item label when the preview panel is visible
-#define LIST_LABEL_SCROLL_SPEED 2  // pixels advanced per render frame
-#define LIST_LABEL_SCROLL_DELAY 30 // frames of initial pause before scrolling starts
-#define LIST_LABEL_SCROLL_PAUSE 20 // frames to hold at end before resetting to start
+#define LIST_LABEL_SCROLL_SPEED  2  // pixels advanced per render frame
+#define LIST_LABEL_SCROLL_DELAY 30  // frames of initial pause before scrolling starts
+#define LIST_LABEL_SCROLL_PAUSE 20  // frames to hold at end before resetting to start
+#define LIST_LABEL_END_MARGIN   30  // right-side padding (px) mirroring theme_renderListLabel
 
-// Persistent state for the active-item marquee scroll
+// Persistent state for the active-item marquee scroll.
+// Rendering is single-threaded (SDL main loop), so plain statics are safe.
 static SDL_Surface *_list_scroll_surface = NULL;
 static int          _list_scroll_x       = 0;
 static int          _list_scroll_list_id = -1;
@@ -207,7 +209,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
             if (_list_scroll_surface == NULL)
                 _list_scroll_surface = TTF_RenderUTF8_Blended(list_font, item->label, theme()->list.color);
 
-            int avail_w = label_end - offset_x - 30 * g_scale;
+            int avail_w = label_end - offset_x - LIST_LABEL_END_MARGIN * g_scale;
 
             if (_list_scroll_surface != NULL && avail_w > 0 && _list_scroll_surface->w > avail_w) {
                 // Label is wider than the available space: apply marquee scrolling
@@ -242,6 +244,13 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
                 screen, item->description, theme()->grid.color, offset_x,
                 item_bg_rect.y + 62 * g_scale, list->active_pos == i, label_end, show_disabled);
         }
+    }
+
+    // If no preview is active this frame, release any cached scroll surface so
+    // memory is not retained after the user navigates away from a previewed item.
+    if (active_preview == NULL && _list_scroll_surface != NULL) {
+        SDL_FreeSurface(_list_scroll_surface);
+        _list_scroll_surface = NULL;
     }
 
     if (active_preview != NULL) {
