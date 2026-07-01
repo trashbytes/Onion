@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
                 theme_renderHeader(screen, has_title ? title_str : NULL,
                                    !has_title);
             }
-            if (list_changed || info_showned) {
+            if (list_changed || info_showned || theme_listMarqueeNeedsRedraw()) {
                 theme_renderList(screen, &list);
 
                 if (has_message)
