@@ -237,8 +237,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
                 }
                 list_scroll_list_id = list->_id;
                 list_scroll_active = list->active_pos;
-                strncpy(list_scroll_label, item->label, sizeof(list_scroll_label) - 1);
-                list_scroll_label[sizeof(list_scroll_label) - 1] = '\0';
+                snprintf(list_scroll_label, sizeof(list_scroll_label), "%s", item->label);
                 list_scroll_start_ms = SDL_GetTicks();
             }
 
@@ -263,6 +262,7 @@ void theme_renderListCustom(SDL_Surface *screen, List *list, ListRenderParams_s 
                     Uint32 move_ms = elapsed_ms - LIST_LABEL_SCROLL_DELAY_MS;
                     Uint32 travel_ms = (Uint32)(((Uint64)max_offset * 1000ULL) / LIST_LABEL_SCROLL_PX_PER_SEC);
 
+                    // Defensive guard for very small/edge values.
                     if (travel_ms == 0)
                         travel_ms = 1;
 
